@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Lambda function with optional parameters
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Optional Parameters"
+        Parameters:
+          - Architectures
+          - CodeS3ObjectVersion
+          - CodeSigningConfigArn
+          - DeadLetterConfigTargetArn
+          - Description
+          - EphemeralStorageSize
+          - FunctionName
+          - KmsKeyArn
+          - Layers
+          - MemorySize
+          - ReservedConcurrentExecutions
+          - Timeout
+          - TracingConfigMode
+      
+      - Label:
+          default: "Mandatory Parameters"
+        Parameters:
+          - CodeS3Bucket
+          - CodeS3Key
+          - Handler
+          - PackageType
+          - Role
+          - Runtime
+
+Parameters:
+
+  Architectures:
+    Type: CommaDelimitedList
+    Description: The instruction set architecture that the function supports.
+    Default: ''
+  
+  CodeS3Bucket:
+    Type: String
+    Description: An Amazon S3 bucket in the same AWS Region as your function. The bucket can be in a different AWS account.
+
+  
+  CodeS3Key:
+    Type: String
+    Description: The Amazon S3 key of the deployment package.
+
+  CodeS3ObjectVersion:
+    Type: String
+    Description: For versioned objects, the version of the deployment package object to use.
+    Default: ''
+
+  CodeSigningConfigArn:
+    Type: String
+    Description: To enable code signing for this function, specify the ARN of a code-signing configuration. A code-signing configuration includes a set of signing profiles, which define the trusted publishers for this function.
+    Default: ''
+
+  DeadLetterConfigTargetArn:
+    Type: String
+    Description: The Amazon Resource Name (ARN) of an Amazon SQS queue or Amazon SNS topic.
+    Default: ''
+
+  Description:
+    Type: String 
+    Description: A description of the function.
+    Default: ''
+
+  EphemeralStorageSize:
+    Type: String
+    Description: The size of the function's /tmp directory.
+    Default: ''
+
+  FunctionName:
+    Type: String
+    Description: The name of the Lambda function, up to 64 characters in length.
+    Default: ''
+
+  Handler:
+    Type: String
+    Description: The name of the method within your code that Lambda calls to run your function. Example lambda_function.lambda_handler
+
+  KmsKeyArn:
+    Type: String 
+    Description: The ARN of the AWS Key Management Service (AWS KMS) customer managed key that's used to encrypt your function's environment variables.
+    Default: ''
+
+  Layers:
+    Type: CommaDelimitedList
+    Description: A list of function layers to add to the function's execution environment. Specify each layer by its ARN, including the version.
+    Default: ''
+
+  MemorySize:
+    Type: String 
+    Description: The amount of memory available to the function at runtime
+    Default: ''
+
+  PackageType:
+    Type: String
+    Description: The type of deployment package. Set to Image for container image and set Zip for .zip file archive.
+    AllowedValues:
+      - Image
+      - Zip
+    Default: Zip
+
+  ReservedConcurrentExecutions:
+    Type: String
+    Description: The number of simultaneous executions to reserve for the function.
+    Default: ''
+
+  Role:
+    Type: String
+    Description: Role ARN
+
+  Runtime:
+    Type: String
+    Description: The identifier of the function's runtime.
+  
+  Timeout:
+    Type: String
+    Description: he amount of time (in seconds) that Lambda allows a function to run before stopping it.
+    Default: ''
+  
+  TracingConfigMode:
+    Type: String
+    Description: The tracing mode.
+    Default: ''
+
+
+Conditions:
+  HasArchitectures: !Not [ !Equals [!Join ['', !Ref Architectures], '']]
+
+  HasCodeS3ObjectVersion: !Not [ !Equals [!Ref CodeS3ObjectVersion, ''] ]
+
+  HasCodeSigningConfigArn: !Not [ !Equals [!Ref CodeSigningConfigArn, ''] ]
+
+  HasDeadLetterConfigTargetArn: !Not [ !Equals [!Ref DeadLetterConfigTargetArn, ''] ]
+
+  HasDescription: !Not [ !Equals [!Ref Description, ''] ]
+
+  HasEphemeralStorageSize: !Not [ !Equals [!Ref EphemeralStorageSize, ''] ]
+
+  HasFunctionName: !Not [ !Equals [!Ref FunctionName, ''] ]
+
+  HasLayers: !Not [ !Equals [!Join ['', !Ref Layers], '']]
+
+  HasMemorySize: !Not [ !Equals [!Ref MemorySize, ''] ]
+
+  HasReservedConcurrentExecutions: !Not [ !Equals [!Ref ReservedConcurrentExecutions, ''] ]
+
+  HasTimeout: !Not [ !Equals [!Ref Timeout, ''] ]
+
+  HasTracingConfigMode: !Not [ !Equals [!Ref TracingConfigMode, ''] ]
+
+
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures: !If [HasArchitectures, !Ref Architectures, !Ref AWS::NoValue]
+      Code: 
+        S3Bucket: !Ref CodeS3Bucket
+        S3Key: !Ref CodeS3Key
+        S3ObjectVersion: !If [HasCodeS3ObjectVersion, !Ref CodeS3ObjectVersion, !Ref AWS::NoValue]
+      CodeSigningConfigArn: !If [HasCodeSigningConfigArn, !Ref CodeSigningConfigArn, !Ref AWS::NoValue]
+      DeadLetterConfig: 
+        TargetArn: !If [HasDeadLetterConfigTargetArn, !Ref DeadLetterConfigTargetArn, !Ref AWS::NoValue]
+      Description: !If [HasDescription, !Ref Description, !Ref AWS::NoValue]
+      EphemeralStorage: 
+        Size: !If [HasEphemeralStorageSize, !Ref Size, !Ref 512]
+      FunctionName: !If [HasFunctionName, !Ref FunctionName, !Ref AWS::NoValue]
+      Handler: !Ref Handler
+      KmsKeyArn: !If [HasKmsKeyArn, !Ref KmsKeyArn, !Ref AWS::NoValue]
+      Layers: !If [HasLayers, !Ref Layers, !Ref AWS::NoValue]
+      MemorySize: !If [HasMemorySize, !Ref MemorySize, !Ref AWS::NoValue]
+      PackageType: !Ref PackageType
+      ReservedConcurrentExecutions: !If [HasReservedConcurrentExecutions, !Ref ReservedConcurrentExecutions, !Ref AWS::NoValue]
+      Role: !Ref Role
+      Runtime: !Ref Runtime
+      Timeout: !If [HasTimeout, !Ref Timeout, !Ref AWS::NoValue]
+      TracingConfig: 
+        Mode: !If [HasTracingConfigMode, !Ref TracingConfigMode, !Ref AWS::NoValue]
+
+
+Outputs:
+  LambdaFunctionName:
+    Description: Name of the Lambda Function
+    Value: !Ref LambdaFunction
+
+  LambdaFunctionARN:
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
