@@ -144,6 +144,8 @@ Conditions:
 
   HasFunctionName: !Not [ !Equals [!Ref FunctionName, ''] ]
 
+  HasKmsKeyArn: !Not [ !Equals [!Ref KmsKeyArn, ''] ]
+
   HasLayers: !Not [ !Equals [!Join ['', !Ref Layers], '']]
 
   HasMemorySize: !Not [ !Equals [!Ref MemorySize, ''] ]
@@ -170,7 +172,7 @@ Resources:
         TargetArn: !If [HasDeadLetterConfigTargetArn, !Ref DeadLetterConfigTargetArn, !Ref AWS::NoValue]
       Description: !If [HasDescription, !Ref Description, !Ref AWS::NoValue]
       EphemeralStorage: 
-        Size: !If [HasEphemeralStorageSize, !Ref Size, !Ref 512]
+        Size: !If [HasEphemeralStorageSize, !Ref EphemeralStorageSize, 512]
       FunctionName: !If [HasFunctionName, !Ref FunctionName, !Ref AWS::NoValue]
       Handler: !Ref Handler
       KmsKeyArn: !If [HasKmsKeyArn, !Ref KmsKeyArn, !Ref AWS::NoValue]
