@@ -44,16 +44,6 @@ Resources:
       AttributeDefinitions: 
         - AttributeName: CustomerId
           AttributeType: S
-        - AttributeName: CustomerName
-          AttributeType: S
-        - AttributeName: CustomerAge
-          AttributeType: "N"
-        - AttributeName: CustomerPhone
-          AttributeType: S
-        - AttributeName: CustomerEmail
-          AttributeType: S
-        - AttributeName: CustomerPassword
-          AttributeType: S
       BillingMode: !If [ProvisionedMode, !Ref BillingMode, !Ref AWS::NoValue]
       KeySchema: 
         - AttributeName: CustomerId
