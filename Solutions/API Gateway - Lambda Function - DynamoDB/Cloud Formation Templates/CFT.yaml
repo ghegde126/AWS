@@ -38,7 +38,7 @@ Conditions:
 
 
 Resources:
-  DynamoDB:
+  DynamoDBTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions: 
@@ -64,4 +64,10 @@ Resources:
 
 
 Outputs:
-  
+  DynamoDBTableName:
+    Description: Name of the DynamoDB Table. 
+    Value: !Ref DynamoDBTable
+
+  DynamoDBTableARN: 
+    Description: ARN of DynamoDB Table.
+    Value: !GetAtt DynamoDBTable.Arn
