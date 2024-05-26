@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Serverless application setup. API Gateway - Lambda Function - DynamoDB
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "DynamoDB Parameters"
+        Parameters:
+          - BillingMode
+          - ReadCapacityUnits
+          - WriteCapacityUnits
+
+Parameters:
+
+  BillingMode:
+    Type: String
+    Description: Specify the billing mode. 
+    AllowedValues:
+      - PAY_PER_REQUEST
+      - PROVISIONED
+    Default: PAY_PER_REQUEST
+  
+  ReadCapacityUnits:
+    Type: String
+    Description: Read Capacity Units, valid only for provisioned mode.
+    Default: "0"
+  
+  WriteCapacityUnits:
+    Type: String
+    Description: Write Capacity Units, valid only for provisioned mode.
+    Default: "0"
+
+
+Conditions:
+  ProvisionedMode: !Not [ !Equals [!Ref BillingMode, PROVISIONED] ]
+
+
+Resources:
+  DynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions: 
+        - AttributeName: CustomerId
+          AttributeType: S
+        - AttributeName: CustomerName
+          AttributeType: S
+        - AttributeName: CustomerAge
+          AttributeType: "N"
+        - AttributeName: CustomerPhone
+          AttributeType: S
+        - AttributeName: CustomerEmail
+          AttributeType: S
+        - AttributeName: CustomerPassword
+          AttributeType: S
+      BillingMode: !If [ProvisionedMode, !Ref BillingMode, !Ref AWS::NoValue]
+      KeySchema: 
+        - AttributeName: CustomerId
+          KeyType: HASH
+      ProvisionedThroughput: 
+        ReadCapacityUnits: !If [ProvisionedMode, 0, !Ref ReadCapacityUnits]
+        WriteCapacityUnits: !If [ProvisionedMode, 0, !Ref WriteCapacityUnits]
+
+
+Outputs:
+  
