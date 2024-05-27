@@ -8,11 +8,44 @@ Metadata:
       - Label:
           default: "DynamoDB Parameters"
         Parameters:
+          - AttributeDefinitionsAttributeName
+          - AttributeDefinitionsAttributeType
           - BillingMode
           - ReadCapacityUnits
           - WriteCapacityUnits
+          - ApiKeySourceType
+      
+      - Label:
+          default: "Lambda Function Parameters"
+        Parameters:
+          - RetentionInDays
+          - LoggingConfigApplicationLogLevel
+          - LoggingConfigLogFormat
+          - SystemLogLevel
+          - Runtime
+          - Timeout
+          - LoggingConfigSystemLogLevel
+      
+      - Label:
+          default: "API Setup Parameters"
+        Parameters:
+          - ApiKeySourceType
+
 
 Parameters:
+  AttributeDefinitionsAttributeName:
+    Type: String
+    Description: Primary key of the table.
+    Default: CustomerId
+
+  AttributeDefinitionsAttributeType:
+    Type: String
+    Description: Type of the primary key.
+    Default: "S" 
+    AllowedValues: 
+      - "S"
+      - "N"
+      - "B" 
 
   BillingMode:
     Type: String
@@ -31,6 +64,61 @@ Parameters:
     Type: String
     Description: Write Capacity Units, valid only for provisioned mode.
     Default: "0"
+  
+  RetentionInDays:
+    Type: String
+    Description: Log retention days.
+    Default: "7"
+  
+  LoggingConfigApplicationLogLevel:
+    Type: String
+    Description: Set this property to filter the application logs for your function that Lambda sends to CloudWatch.
+    Default: INFO
+    AllowedValues:
+      - TRACE
+      - DEBUG
+      - INFO
+      - WARN
+      - ERROR
+      - FATAL
+  
+  LoggingConfigLogFormat:
+    Type: String 
+    Description: The format in which Lambda sends your function's application and system logs to CloudWatch. Select between plain text and structured JSON.
+    Default: JSON
+    AllowedValues:
+      - JSON
+      - JSON
+  
+  LoggingConfigSystemLogLevel:
+    Type: String
+    Description: Set this property to filter the system logs for your function that Lambda sends to CloudWatch. Lambda only sends system logs at the selected level of detail and lower, where DEBUG is the highest level and WARN is the lowest.
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARN
+  
+  Runtime:
+    Type: String 
+    Description: The identifier of the function's runtime.
+    Default: python3.12
+  
+  Timeout:
+    Type: Number
+    Description: The amount of time (in seconds) that Lambda allows a function to run before stopping it.
+    Default: 20
+    MinValue: 3
+    MaxValue: 900
+
+  ApiKeySourceType:
+    Type: String
+    Description: The source of the API key for metering requests according to a usage plan. Valid values are: HEADER to read the API key from the X-API-Key header of a request. AUTHORIZER to read the API key from the UsageIdentifierKey from a custom authorizer.
+    AllowedValues: 
+      - HEADER
+      - AUTHORIZER
+    Default: HEADER
+
 
 
 Conditions:
@@ -42,8 +130,8 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions: 
-        - AttributeName: CustomerId
-          AttributeType: S
+        - AttributeName: !Ref AttributeDefinitionsAttributeName
+          AttributeType: !Ref AttributeDefinitionsAttributeType
       BillingMode: !If [ProvisionedMode, !Ref BillingMode, !Ref AWS::NoValue]
       KeySchema: 
         - AttributeName: CustomerId
@@ -51,6 +139,102 @@ Resources:
       ProvisionedThroughput: 
         ReadCapacityUnits: !If [ProvisionedMode, 0, !Ref ReadCapacityUnits]
         WriteCapacityUnits: !If [ProvisionedMode, 0, !Ref WriteCapacityUnits]
+
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    DependsOn: DynamoDBTable
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Join ["", [!Ref "AWS::StackName", "-lambda-function-role"]]
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies: 
+        - PolicyName: !Join ["", [!Ref "AWS::StackName", "-lambda-function-role-dynamodb-policy"]]
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource: !GetAtt DynamoDBTable.Arn
+  
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", [!Ref "AWS::StackName", "-lambda-function-log-group"]]
+      RetentionInDays: !Ref RetentionInDays
+  
+  SQSQueue:
+    Type: AWS::SQS::Queue
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:  
+      - LambdaFunctionRole
+      - LambdaFunctionLogGroup
+      - SQSQueue
+    Properties:
+      Code:
+        ZipFile: |
+          def lambda_handler(event,context):
+            print('It's working, move to next steps')
+      Description: !Join ["", [!Ref "AWS::StackName", "-lambda-function"]]
+      Environment:
+        Variables:
+          logging_level: INFO
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: !Ref LoggingConfigApplicationLogLevel
+        LogFormat: !Ref LoggingConfigLogFormat
+        LogGroup: !Join ["", [!Ref "AWS::StackName", "-lambda-function-log-group"]]
+        SystemLogLevel: !Ref LoggingConfigSystemLogLevel
+      PackageType: Zip
+      Role: !GetAtt LambdaFunctionRole.Arn
+      Runtime: !Ref Runtime
+      Timeout: !Ref Timeout
+
+  RestAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: !Ref ApiKeySourceType
+      Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-setup"]]
+      EndpointConfiguration: 
+        Types: 
+          - REGIONAL
+      Name: !Join ["", [!Ref "AWS::StackName", "-rest-api-setup"]]
+
+
+  APIResourceHealthCheck:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: healthCheck
+      RestApiId: !Ref RestAPI
+
+  APIResourceGetCustomer:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: getCustomer
+      RestApiId: !Ref RestAPI
+  
+  APIResourceCreateCustomer:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: createCustomer
+      RestApiId: !Ref RestAPI
 
 
 Outputs:
@@ -61,3 +245,27 @@ Outputs:
   DynamoDBTableARN: 
     Description: ARN of DynamoDB Table.
     Value: !GetAtt DynamoDBTable.Arn
+  
+  LambdaFunctionRoleARN:
+    Description: ARN of Lambda Function Role.
+    Value: !GetAtt LambdaFunctionRole.Arn
+
+  LambdaFunctionARN:
+    Description: ARN of the Lambda Function.
+    Value: !GetAtt LambdaFunction.Arn
+
+  LambdaFunctionLogGroupARN:
+    Description: ARN of the Lambda Function Log Group.
+    Value: LambdaFunctionLogGroup.Arn
+
+  SQSQueueARN:
+    Description: ARN of dead letter queue.
+    Value: !GetAtt SQSQueue.Arn
+
+  RestAPIId:
+    Description: The String Identifier of the Rest API.
+    Value: !GetAtt RestAPI.RestApiId
+  
+  RootResourceId:
+    Description: Root resource Id of the REST API.
+    Value: !GetAtt RestAPI.RootResourceId
