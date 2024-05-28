@@ -347,8 +347,6 @@ Resources:
     Properties:
       Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-key"]]
       Enabled: true
-      GenerateDistinctId: Boolean
-      Name: String
       StageKeys: 
         - RestApiId: !Ref RestAPI
           StageName: !Ref APIStage
