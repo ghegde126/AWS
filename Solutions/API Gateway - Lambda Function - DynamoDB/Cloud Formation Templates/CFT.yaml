@@ -30,6 +30,10 @@ Metadata:
           default: "API Setup Parameters"
         Parameters:
           - ApiKeySourceType
+          - QuotaLimit
+          - QuotaPeriod
+          - ThrottleBurstLimit
+          - ThrottleRateLimit
 
 
 Parameters:
@@ -118,7 +122,33 @@ Parameters:
       - HEADER
       - AUTHORIZER
     Default: HEADER
-
+  
+  QuotaLimit:
+    Type: Number
+    Description: The target maximum number of requests that can be made in a given time period.
+    MinValue: 0
+    Default: 5000
+  
+  QuotaPeriod:
+    Type: String
+    Description: The time period in which the limit applies.
+    Default: MONTH
+    AllowedValues:
+      - MONTH
+      - WEEK
+      - DAY
+  
+  ThrottleBurstLimit:
+    Type: Number
+    Description: The API target request burst rate limit. This allows more requests through for a period of time than the target rate limit.
+    MinValue: 0
+    Default: 2000
+  
+  ThrottleRateLimit:
+    Type: Number
+    Description: The API target request rate limit.
+    MinValue: 0
+    Default: 1000
 
 
 Conditions:
@@ -235,6 +265,124 @@ Resources:
       ParentId: !GetAtt RestAPI.RootResourceId
       PathPart: createCustomer
       RestApiId: !Ref RestAPI
+  
+  APIMethodHealthCheck:
+    Type: AWS::ApiGateway::Method
+    DependsOn: 
+      - LambdaFunction
+      - APIResourceHealthCheck
+      - RestAPI
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration: 
+        IntegrationHttpMethod: GET
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionARN}/invocations"
+          - lambdaFunctionARN: !GetAtt LambdaFunction.Arn
+      ResourceId: !Ref APIResourceHealthCheck
+      RestApiId: !Ref RestAPI
+  
+  APIMethodGetCustomer:
+    Type: AWS::ApiGateway::Method
+    DependsOn: 
+      - LambdaFunction
+      - APIResourceGetCustomer
+      - RestAPI
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration: 
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionARN}/invocations"
+          - lambdaFunctionARN: !GetAtt LambdaFunction.Arn
+      ResourceId: !Ref APIResourceGetCustomer
+      RestApiId: !Ref RestAPI
+  
+  APIMethodCreateCustomer:
+    Type: AWS::ApiGateway::Method
+    DependsOn: 
+      - LambdaFunction
+      - APIResourceCreateCustomer
+      - RestAPI
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration: 
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionARN}/invocations"
+          - lambdaFunctionARN: !GetAtt LambdaFunction.Arn
+      ResourceId: !Ref APIResourceCreateCustomer
+      RestApiId: !Ref RestAPI
+  
+  APIStageDeploy:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - APIMethodHealthCheck
+      - APIMethodGetCustomer
+      - APIMethodCreateCustomer
+    Properties:
+      Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-deployment"]]
+      RestApiId: !Ref RestAPI
+  
+  APIStage:
+    Type: AWS::ApiGateway::Stage
+    DependsOn: APIStageDeploy
+    Properties:
+      DeploymentId: !Ref APIStageDeploy
+      Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-stage"]]
+      RestApiId: !Ref RestAPI
+  
+  APIKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: APIStage
+    Properties:
+      Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-key"]]
+      Enabled: true
+      GenerateDistinctId: Boolean
+      Name: String
+      StageKeys: 
+        - RestApiId: !Ref RestAPI
+          StageName: !Ref APIStage
+  
+  APIUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages: 
+        - ApiId: !Ref RestAPI
+          Stage: !Ref APIStage
+      Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-usage-plan"]]
+      Quota: 
+        Limit: !Ref QuotaLimit
+        Period: !Ref QuotaPeriod
+      Throttle: 
+        BurstLimit: !Ref ThrottleBurstLimit
+        RateLimit: !Ref ThrottleRateLimit
+
+  APIUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref APIKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref APIUsagePlan
+
+  LambdaFunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestAPI}/*/*/*"
+        - RestAPI: !Ref RestAPI
 
 
 Outputs:
