@@ -268,6 +268,20 @@ Resources:
       PathPart: createCustomer
       RestApiId: !Ref RestAPI
   
+  APIResourceUpdateCustomer:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: updateCustomer
+      RestApiId: !Ref RestAPI
+  
+  APIResourceUpdateCustomerEmail:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: updateCustomerEmail
+      RestApiId: !Ref RestAPI
+  
   APIMethodHealthCheck:
     Type: AWS::ApiGateway::Method
     DependsOn: 
@@ -325,12 +339,52 @@ Resources:
       ResourceId: !Ref APIResourceCreateCustomer
       RestApiId: !Ref RestAPI
   
+  APIMethodUpdateCustomer:
+    Type: AWS::ApiGateway::Method
+    DependsOn: 
+      - LambdaFunction
+      - APIResourceUpdateCustomer
+      - RestAPI
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration: 
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionARN}/invocations"
+          - lambdaFunctionARN: !GetAtt LambdaFunction.Arn
+      ResourceId: !Ref APIResourceUpdateCustomer
+      RestApiId: !Ref RestAPI
+
+  APIMethodUpdateCustomerEmail:
+    Type: AWS::ApiGateway::Method
+    DependsOn: 
+      - LambdaFunction
+      - APIResourceUpdateCustomerEmail
+      - RestAPI
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration: 
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaFunctionARN}/invocations"
+          - lambdaFunctionARN: !GetAtt LambdaFunction.Arn
+      ResourceId: !Ref APIResourceUpdateCustomerEmail
+      RestApiId: !Ref RestAPI
+  
   APIStageDeploy:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - APIMethodHealthCheck
       - APIMethodGetCustomer
       - APIMethodCreateCustomer
+      - APIMethodUpdateCustomer
+      - APIMethodUpdateCustomerEmail
     Properties:
       Description: !Join ["", [!Ref "AWS::StackName", "-rest-api-deployment"]]
       RestApiId: !Ref RestAPI
@@ -402,6 +456,26 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 
         - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestAPI}/*/GET/healthCheck"
+        - RestAPI: !Ref RestAPI
+  
+  LambdaFunctionInvokePermissionUpdateCustomer:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestAPI}/*/POST/updateCustomer"
+        - RestAPI: !Ref RestAPI
+  
+  LambdaFunctionInvokePermissionUpdateCustomerEmail:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 
+        - "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestAPI}/*/POST/updateCustomerEmail"
         - RestAPI: !Ref RestAPI
 
 
