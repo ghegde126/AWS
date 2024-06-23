@@ -1,6 +1,10 @@
 # Customer Details Storage Application (API Gateway - Lambda Function - DynamoDB)
 
 1. [Introduction](#introduction)
+2. [Architecture](#architecture)
+3. [Prerequisites](#prerequisites)
+4. [Steps](#steps)
+5. [Resources](#resources)
 
 ## Introduction
 In this use case, we will be looking into how to create a customer details management application using completely AWS native serverless services. We will also look into how to deploy the required infrastructure using Cloud Formation Templates and how to test the application endpoints. More details on this can be seen in later part of the article. 
